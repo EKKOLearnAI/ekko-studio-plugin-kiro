@@ -20,7 +20,7 @@ The settings pages use the Studio host’s `KIRO_HOME` or `~/.kiro`, shared with
 
 ## Runtime
 
-The plugin starts Kiro CLI 3.x in ACP V3 mode. Global mode uses the native Kiro catalog. Both modes forward Kiro tool permission requests through Studio’s approval dialog. Attachments are sent as ACP images when supported or staged in a private directory for the native file tools. Studio’s authorized MCP servers are sent with each session.
+The plugin starts Kiro CLI 3.x in ACP V3 mode. Global mode uses the native Kiro catalog. Both modes use Kiro’s session-wide `allow-all` preset. The plugin automatically grants any one-time tool permission offered for the active turn. Tools run with the permissions of the Studio service account. Attachments are sent as ACP images when supported or staged in a private directory for the native file tools. Studio’s authorized MCP servers are sent with each session.
 
 Scoped mode runs the same Kiro CLI through a private loopback relay that uses the Studio model lease. It starts without a Kiro login. This path was verified with Kiro CLI 3.5.0. Each turn starts a native session with Studio conversation history. See the [runtime contract](docs/CONTRACTS.md) and [Kiro ACP guide](https://kiro.dev/docs/cli/v3/acp-migration/).
 

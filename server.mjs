@@ -52,10 +52,11 @@ function acpServers(servers, capabilities) {
   })
 }
 
-async function startSession(acp, cwd, mcpServers, capabilities, signal, additionalDirectory) {
+async function startSession(acp, cwd, mcpServers, capabilities, signal, { additionalDirectory, allowAllTools = false } = {}) {
   const session = await acp.request('session/new', {
     cwd, mcpServers: acpServers(mcpServers, capabilities.mcpCapabilities),
     ...(additionalDirectory ? { additionalDirectories: [additionalDirectory] } : {}),
+    ...(allowAllTools ? { _meta: { kiro: { policyPreset: ['allow-all'] } } } : {}),
   }, signal)
   if (!validId(session?.sessionId)) throw new Error('Kiro did not return a valid ACP session ID.')
   return session
@@ -132,32 +133,12 @@ async function listModels(ctx, getEngine) {
   }
 }
 
-function scrub(value) {
-  const result = (typeof value === 'string' ? value : '').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
-  return result
-    .replace(/\bBearer\s+[^\s"'\\,;]+/gi, 'Bearer [redacted]')
-    .replace(/((?:[\w-]*(?:api[-_ ]?key|token|secret|password)|authorization)["']?\s*[:=]\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s"'\\,;]+)/gi, '$1[redacted]')
-    .slice(0, 4096)
-}
-
-async function requestPermission(params, run, signal) {
-  const tool = params.toolCall
-  const options = Array.isArray(params.options) ? params.options.filter(option => validId(option?.optionId)) : []
+function toolPermission(params) {
+  const options = Array.isArray(params.options) ? params.options : []
+  if (!validId(params.toolCall?.toolCallId) || options.some(option => !validId(option?.optionId))
+    || new Set(options.map(option => option.optionId)).size !== options.length) return cancelled
   const allow = options.filter(option => option.kind === 'allow_once')
-  const reject = options.find(option => option.kind === 'reject_once')
-  if (!validId(tool?.toolCallId) || allow.length !== 1 || new Set(options.map(option => option.optionId)).size !== options.length || signal.aborted) return cancelled
-  const title = scrub(tool.title) || 'Kiro tool request'
-  const raw = tool.rawInput
-  const details = scrub(typeof raw === 'string' ? raw : raw?.command ?? raw?.path ?? raw?.filePath ?? params._meta?.kiro?.consent?.resource) || title
-  try {
-    const decision = await run.interactions.approve({ operationId: tool.toolCallId, title, details })
-    if (signal.aborted) return cancelled
-    const choice = decision.outcome === 'approved' ? allow[0] : decision.outcome === 'denied' ? reject : undefined
-    if (choice) return { outcome: { outcome: 'selected', optionId: choice.optionId } }
-  } catch {
-    // Without a valid Studio answer the tool stays blocked.
-  }
-  return cancelled
+  return allow.length === 1 ? { outcome: { outcome: 'selected', optionId: allow[0].optionId } } : cancelled
 }
 
 function streamTurn(run) {
@@ -282,12 +263,7 @@ async function executeTurn(input, run, getEngine, signal, canUseNativeResources)
       if (id !== undefined) {
         if (method === '_kiro/auth/getAccessToken' && scoped && !currentSignal.aborted) acp.respond(id, scoped.proxy.auth())
         else if (method !== 'session/request_permission') acp.methodNotFound(id)
-        else if (!current) acp.respond(id, cancelled)
-        else {
-          void requestPermission(params, run, currentSignal)
-            .then(result => acp.respond(id, currentSignal.aborted ? cancelled : result))
-            .catch(() => {})
-        }
+        else acp.respond(id, current ? toolPermission(params) : cancelled)
       } else if (current && method === 'session/update') {
         updates = updates.then(async () => {
           if (!currentSignal.aborted && !streamError) await turn.update(params.update)
@@ -299,7 +275,9 @@ async function executeTurn(input, run, getEngine, signal, canUseNativeResources)
     const startup = AbortSignal.any([signal, AbortSignal.timeout(25_000)])
     const capabilities = await initialize(acp, startup, Boolean(scoped))
     const prompt = await buildPrompt(input, attachments, capabilities.promptCapabilities)
-    let session = await startSession(acp, cwd, run.mcpServers ?? {}, capabilities, startup, attachments.directory)
+    let session = await startSession(acp, cwd, run.mcpServers ?? {}, capabilities, startup, {
+      additionalDirectory: attachments.directory, allowAllTools: true,
+    })
     currentSession = session.sessionId
     if (scoped) {
       if (!scoped.proxy.listed || !modelsFrom(session).has(scopedModelId)) {

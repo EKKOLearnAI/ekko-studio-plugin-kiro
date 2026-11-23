@@ -35,22 +35,22 @@ async function setup(t, engine = fixture) {
   return { root, definition, rpc }
 }
 
-async function chat(definition, root, name, { model, decision, assets = {}, mcpServers = {} } = {}) {
+async function chat(definition, root, name, { model, assets = {}, mcpServers = {} } = {}) {
   const paths = { runtimeDir: join(root, 'runtime-' + name), workspaceDir: join(root, name) }
   await mkdir(paths.workspaceDir)
   const controller = new AbortController()
   const identity = { ...owner, sessionId: name, runId: 'run-' + name }
-  const calls = [], events = []
+  const events = []
   const ctx = { identity, paths, mode: 'global', model: model ? { model } : {}, lifecycle, signal: controller.signal,
     deadlineAt: Date.now() + 12_000, mcpServers,
-    interactions: { async approve(call) { calls.push(call); return { outcome: decision ?? 'denied' } } },
+    interactions: { async approve() { assert.fail('Tool calls must not prompt in Studio.') } },
     output: { async emit(event) { events.push(event) } },
     attachments: {
       async resolve(id) { return { ...assets[id], size: assets[id].bytes.length } },
       async read(id) { return assets[id].bytes },
     },
   }
-  return { ctx, calls, events, controller, session: definition.runtime.createSession(ctx) }
+  return { ctx, events, controller, session: definition.runtime.createSession(ctx) }
 }
 
 test('lists grouped native models and protects native access by user and Profile', nativeFixture, async t => {
@@ -68,18 +68,19 @@ test('lists grouped native models and protects native access by user and Profile
   await assert.rejects(rpc.get('native-login')(null, other), /Profile/)
 })
 
-test('streams the selected model, bridges MCP, and routes only current one-time approvals', nativeFixture, async t => {
+test('streams the selected model and auto-approves only offered one-time grants for the active session', nativeFixture, async t => {
   const { root, definition } = await setup(t)
-  const first = await chat(definition, root, 'mcp', { model: 'model-b', decision: 'approved', mcpServers: {
+  const first = await chat(definition, root, 'mcp', { model: 'model-b', mcpServers: {
     studio: { command: 'node', args: ['studio.mjs'], env: { TEST: '1' } },
     remote: { url: 'https://example.test/mcp', headers: { Authorization: 'test' } },
   } })
-  const second = await chat(definition, root, 'deny', { model: 'model-a' })
-  const result = await Promise.all([first, second].map(run => run.session.run(input, run.ctx)))
-  assert.deepEqual(result.map(value => value.content[0].text), ['model-b:allow', 'model-a:deny'])
-  assert.deepEqual(first.calls, [{ operationId: 'tool', title: 'Shell', details: 'echo check' }])
+  const foreign = await chat(definition, root, 'foreign')
+  const noAllowOnce = await chat(definition, root, 'no-allow-once')
+  const result = await Promise.all([first, foreign, noAllowOnce].map(run => run.session.run(input, run.ctx)))
+  assert.deepEqual(result.map(value => value.content[0].text), ['model-b:allow', 'model-a:cancelled', 'model-a:cancelled'])
   assert.deepEqual(first.events.map(event => event.type), ['reasoning.summary.delta', 'tool.started', 'text.delta', 'tool.completed'])
-  assert.equal(second.events.at(-1).type, 'tool.failed')
+  assert.equal(foreign.events.at(-1).type, 'tool.failed')
+  assert.equal(noAllowOnce.events.at(-1).type, 'tool.failed')
   const mismatched = await chat(definition, root, 'mismatch', { model: 'model-b' })
   await assert.rejects(mismatched.session.run(input, mismatched.ctx), /did not confirm/)
   assert.equal(mismatched.events.length, 0)
@@ -93,7 +94,7 @@ test('passes image and file bytes and removes private attachment staging', nativ
   } })
   const photo = { type: 'image', assetId: 'image' }
   const result = await run.session.run({ ...input, input: [...input.input, { type: 'file', assetId: 'text' }, photo, photo] }, run.ctx)
-  assert.equal(result.content[0].text, 'model-a:deny')
+  assert.equal(result.content[0].text, 'model-a:allow')
   assert.deepEqual(await readdir(run.ctx.paths.runtimeDir), [])
 })
 

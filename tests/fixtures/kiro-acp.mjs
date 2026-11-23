@@ -30,6 +30,7 @@ for await (const line of createInterface({ input: process.stdin })) {
       break
     case 'session/new':
       assert.equal(params.cwd, process.cwd())
+      assert.deepEqual(params._meta, mode.startsWith('kiro-catalog-') ? undefined : { kiro: { policyPreset: ['allow-all'] } })
       if (mode === 'mcp') assert.deepEqual(params.mcpServers, [
         { name: 'studio', command: 'node', args: ['studio.mjs'], env: [{ name: 'TEST', value: '1' }] },
         { name: 'remote', type: 'http', url: 'https://example.test/mcp', headers: [{ name: 'Authorization', value: 'test' }] },
@@ -60,12 +61,15 @@ for await (const line of createInterface({ input: process.stdin })) {
       update({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'replay' }, _meta: { kiro: { replay: true } } })
       update({ sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'summary' } })
       update({ sessionUpdate: 'tool_call', toolCallId: 'tool', kind: 'execute', status: 'in_progress' })
-      send({ id: 100, method: 'session/request_permission', params: { sessionId, toolCall: {
-        toolCallId: 'tool', title: 'Shell', rawInput: { command: 'echo check' },
-      }, options: [
-        { optionId: 'allow', kind: 'allow_once' }, { optionId: 'deny', kind: 'reject_once' },
-        { optionId: 'always', kind: 'allow_always' },
-      ] } })
+      send({ id: 100, method: 'session/request_permission', params: {
+        sessionId: mode === 'foreign' ? 'foreign-session' : sessionId,
+        toolCall: { toolCallId: 'tool', title: 'Tool call' },
+        options: [
+          { optionId: 'always', kind: 'allow_always' },
+          ...(mode === 'no-allow-once' ? [] : [{ optionId: 'allow', kind: 'allow_once' }]),
+          { optionId: 'deny', kind: 'reject_once' },
+        ],
+      } })
       break
     case 'session/cancel':
       await writeFile(join(process.cwd(), 'cancelled'), params.sessionId)

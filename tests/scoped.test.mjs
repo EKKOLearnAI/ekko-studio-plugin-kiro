@@ -95,7 +95,7 @@ async function turn(definition, root, model, asset) {
   const events = []
   const run = {
     identity, paths, mode: 'scoped', model, lifecycle, signal: controller.signal, deadlineAt: Date.now() + 20_000,
-    mcpServers: {}, interactions: { async approve() { return { outcome: 'approved' } } },
+    mcpServers: {}, interactions: { async approve() { assert.fail('Tool calls must not prompt in Studio.') } },
     output: { async emit(event) { events.push(event) } },
     attachments: {
       async resolve() { return { name: 'test.png', mediaType: 'image/png', size: asset.length } },
@@ -116,7 +116,7 @@ function stream(response, chunks, finishReason) {
   response.end(data({}, finishReason) + 'data: [DONE]\n\n')
 }
 
-test('official Kiro CLI streams two scoped models and forwards native tools and an image without Kiro sign-in',
+test('official Kiro CLI runs shell and file tools without approval in concurrent scoped sessions',
   { skip: !native, timeout: 30_000 }, async t => {
     const seen = []
     const upstream = await startServer(t, async (req, res) => {
@@ -128,7 +128,7 @@ test('official Kiro CLI streams two scoped models and forwards native tools and 
         assert.equal(req.headers.authorization, 'Bearer studio-lease-' + input.model)
         assert.equal(input.stream, true)
         assert.ok(input.tools.some(tool => tool.function.name === 'read_file'))
-        const fromTool = input.messages.find(item => item.role === 'tool')
+        const fromTool = input.messages.find(item => item.role === 'tool' && ['read-note', 'shell-note'].includes(item.tool_call_id))
         seen.push({ model: input.model, tool: Boolean(fromTool) })
         if (fromTool) {
           assert.match(fromTool.content, new RegExp('native file result ' + input.model))
@@ -138,10 +138,19 @@ test('official Kiro CLI streams two scoped models and forwards native tools and 
           assert.ok(input.messages.some(item => JSON.stringify(item.content).includes('Read note.txt')))
           if (input.model === 'studio-a') assert.ok(input.messages.some(item =>
             Array.isArray(item.content) && item.content.some(part => part.type === 'image_url' && part.image_url.url.startsWith('data:image/png;base64,'))))
-          stream(res, [
-            { tool_calls: [{ index: 0, id: 'read-note', function: { name: 'read_file', arguments: '{"path":' } }] },
-            { tool_calls: [{ index: 0, function: { arguments: '"note.txt"}' } }] },
-          ], 'tool_calls')
+          if (input.model === 'studio-a') {
+            assert.ok(input.tools.some(tool => tool.function.name === 'execute_bash'))
+            stream(res, [
+              { tool_calls: [{ index: 0, id: 'shell-note', function: { name: 'execute_bash', arguments: '{"command":' } }] },
+              { tool_calls: [{ index: 0, function: { arguments: '"cat note.txt"}' } }] },
+            ], 'tool_calls')
+          } else {
+            assert.ok(input.tools.some(tool => tool.function.name === 'fs_write'))
+            stream(res, [{ tool_calls: [
+              { index: 0, id: 'read-note', function: { name: 'read_file', arguments: '{"path":"note.txt"}' } },
+              { index: 1, id: 'write-note', function: { name: 'fs_write', arguments: '{"path":"generated.txt","text":"native write"}' } },
+            ] }], 'tool_calls')
+          }
         }
       } catch (error) {
         seen.push(error)
@@ -160,6 +169,7 @@ test('official Kiro CLI streams two scoped models and forwards native tools and 
     assert.deepEqual(answers.map(result => result.status === 'fulfilled' ? result.value.content[0].text : result.reason.message),
       ['Scoped reply studio-a', 'Scoped reply studio-b'])
     assert.ok(seen.filter(item => item.tool).length >= 2)
+    assert.equal(await readFile(join(b.paths.workspaceDir, 'generated.txt'), 'utf8'), 'native write')
     for (const run of [a, b]) {
       assert.ok(run.events.some(event => event.type === 'tool.completed'))
       assert.ok(run.events.some(event => event.type === 'text.delta'))
