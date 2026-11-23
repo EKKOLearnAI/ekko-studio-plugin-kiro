@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "description": "Kiro implements Studio Agent API v1 for native global single chat with streaming.",
+  "description": "Kiro implements Studio Agent API v1 for global and scoped single chat with streaming.",
   "models": {
     "empty": {
       "type": "null",

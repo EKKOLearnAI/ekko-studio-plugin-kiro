@@ -5,6 +5,7 @@ import { Acp, AcpError } from './acp.mjs'
 import { childEnvironment, loginCommand, nativeConfigDir } from './engine.mjs'
 import { managedEngine, packageName } from './managed-engine.mjs'
 import { nativeConfiguration } from './native-config.mjs'
+import { createScopedConfig, scopedModelId, scopedProtocols } from './scoped.mjs'
 import { registerRpc } from './sdk/harness/contracts.mjs'
 import manifest from './plugin.json' with { type: 'json' }
 import contract from './contracts/plugin.json' with { type: 'json' }
@@ -19,17 +20,19 @@ const text = value => ({ type: 'text', text: value })
 const validId = value => typeof value === 'string' && value.trim() === value && value.length > 0 && value.length <= 512
 const sameOwner = (left, right) => left.userId === right.userId && left.profile === right.profile
 
-function setupAcp(engine, cwd, onFrame) {
-  return new Acp(engine, ['acp', '--agent-engine=v3'], { cwd, env: childEnvironment() }, onFrame)
+function setupAcp(engine, cwd, onFrame, scoped) {
+  const args = ['acp', '--agent-engine=v3', ...(scoped ? ['--auth-method=client'] : [])]
+  return new Acp(engine, args, { cwd, env: scoped?.env ?? childEnvironment() }, onFrame)
 }
 
-async function initialize(acp, signal) {
+async function initialize(acp, signal, allowAnonymousAgent = false) {
   const hello = await acp.request('initialize', {
     protocolVersion: 1,
     clientInfo: { name: 'ekko-studio-kiro', version: manifest.version },
     clientCapabilities: {},
   }, signal)
-  if (hello?.protocolVersion !== 1 || !/^kiro(?: cli(?: agent)?)?$/i.test(hello.agentInfo?.name ?? '')) {
+  const name = hello?.agentInfo?.name
+  if (hello?.protocolVersion !== 1 || (name ? !/^kiro(?: cli)?(?: agent)?$/i.test(name) : !allowAnonymousAgent)) {
     throw new Error('The executable must provide Kiro CLI ACP V3.')
   }
   return hello.agentCapabilities ?? {}
@@ -248,7 +251,7 @@ async function buildPrompt(input, attachments, capabilities) {
   return prompt
 }
 
-async function executeTurn(input, run, getEngine, signal) {
+async function executeTurn(input, run, getEngine, signal, canUseNativeResources) {
   const executable = await getEngine()
   if (!executable) throw new Error(unavailable)
   const cwd = await realpath(run.paths.workspaceDir)
@@ -258,6 +261,7 @@ async function executeTurn(input, run, getEngine, signal) {
   const currentSignal = AbortSignal.any([signal, finishing.signal])
   const interrupted = Promise.withResolvers()
   let acp
+  let scoped
   let currentSession
   let updates = Promise.resolve()
   let streamError
@@ -270,10 +274,14 @@ async function executeTurn(input, run, getEngine, signal) {
 
   try {
     signal.throwIfAborted()
+    if (run.mode === 'scoped') {
+      scoped = await createScopedConfig(run.model, run.paths.runtimeDir, signal, canUseNativeResources ? nativeConfigDir() : undefined)
+    }
     acp = setupAcp(executable, cwd, ({ id, method, params }) => {
       const current = currentSession && params?.sessionId === currentSession && !currentSignal.aborted
       if (id !== undefined) {
-        if (method !== 'session/request_permission') acp.methodNotFound(id)
+        if (method === '_kiro/auth/getAccessToken' && scoped && !currentSignal.aborted) acp.respond(id, scoped.proxy.auth())
+        else if (method !== 'session/request_permission') acp.methodNotFound(id)
         else if (!current) acp.respond(id, cancelled)
         else {
           void requestPermission(params, run, currentSignal)
@@ -285,16 +293,23 @@ async function executeTurn(input, run, getEngine, signal) {
           if (!currentSignal.aborted && !streamError) await turn.update(params.update)
         }).catch(error => { streamError = error })
       }
-    })
+    }, scoped)
     signal.addEventListener('abort', abort, { once: true })
     run.lifecycle.add(() => acp.close())
     const startup = AbortSignal.any([signal, AbortSignal.timeout(25_000)])
-    const capabilities = await initialize(acp, startup)
+    const capabilities = await initialize(acp, startup, Boolean(scoped))
     const prompt = await buildPrompt(input, attachments, capabilities.promptCapabilities)
     let session = await startSession(acp, cwd, run.mcpServers ?? {}, capabilities, startup, attachments.directory)
     currentSession = session.sessionId
-    if (run.model?.model) session = await selectConfiguration(acp, session, 'model', run.model.model, startup)
-    if (run.model?.reasoningEffort) await selectConfiguration(acp, session, 'effortLevel', run.model.reasoningEffort, startup)
+    if (scoped) {
+      if (!scoped.proxy.listed || !modelsFrom(session).has(scopedModelId)) {
+        throw new Error('This Kiro CLI did not confirm the Studio model relay.')
+      }
+      await selectConfiguration(acp, session, 'model', scopedModelId, startup)
+    } else {
+      if (run.model?.model) session = await selectConfiguration(acp, session, 'model', run.model.model, startup)
+      if (run.model?.reasoningEffort) await selectConfiguration(acp, session, 'effortLevel', run.model.reasoningEffort, startup)
+    }
     const result = await acp.request('session/prompt', { sessionId: currentSession, prompt }, signal)
     currentSession = undefined
     await Promise.race([updates, interrupted.promise])
@@ -304,9 +319,13 @@ async function executeTurn(input, run, getEngine, signal) {
     signal.throwIfAborted()
     if (result?.stopReason === 'cancelled') throw new Error('Kiro cancelled the prompt.')
     if (!Object.hasOwn(stopReasons, result?.stopReason)) throw new Error('Kiro returned an unsupported stop reason.')
-    return { content: [text(turn.answer)], finishReason: stopReasons[result.stopReason] }
+    if (scoped && !scoped.proxy.finishReason) throw new Error('Kiro did not complete a request through the Studio model relay.')
+    const finishReason = scoped?.proxy.finishReason === 'length' ? 'length' : stopReasons[result.stopReason]
+    return { content: [text(turn.answer)], finishReason }
   } catch (error) {
-    if (error instanceof AcpError && error.code === -32000) throw new Error(signIn)
+    if (error instanceof AcpError && error.code === -32000) {
+      throw new Error(scoped ? 'Kiro could not authenticate with the Studio model relay.' : signIn)
+    }
     if (error instanceof AcpError) throw new Error('Kiro rejected an ACP request. Check your selected model and native configuration.')
     if (!signal.aborted && error?.name === 'TimeoutError') throw new Error('Kiro ACP startup timed out.')
     throw error
@@ -314,12 +333,12 @@ async function executeTurn(input, run, getEngine, signal) {
     finishing.abort()
     signal.removeEventListener('abort', abort)
     try { await acp?.close() }
-    finally { await attachments.dispose() }
+    finally { await Promise.all([attachments.dispose(), scoped?.dispose()]) }
   }
 }
 
 function createSession(owner, session, getEngine) {
-  if (session.mode !== 'global' || !sameOwner(owner, session.identity)) throw new Error(ownerOnly)
+  if (session.mode !== 'scoped' && (session.mode !== 'global' || !sameOwner(owner, session.identity))) throw new Error(ownerOnly)
   const disposed = new AbortController()
   let active
   return {
@@ -332,7 +351,7 @@ function createSession(owner, session, getEngine) {
       const deadline = AbortSignal.timeout(remaining)
       const signal = AbortSignal.any([session.signal, run.signal, disposed.signal, deadline])
       signal.throwIfAborted()
-      active = executeTurn(input, run, getEngine, signal)
+      active = executeTurn(input, run, getEngine, signal, sameOwner(owner, run.identity))
       try { return await active }
       catch (error) {
         if (signal.aborted) throw new Error(deadline.aborted ? 'Kiro turn timed out.' : 'Kiro turn cancelled.')
@@ -383,6 +402,7 @@ export function apply(ctx) {
     },
     modes: {
       global: { listModels: run => sameOwner(owner, run.identity) ? listModels(run, getEngine) : catalog('auth_required', ownerOnly) },
+      scoped: { protocols: scopedProtocols },
     },
     features: { surfaces: ['chat'], streaming: true, resume: false },
     runtime: { createSession: session => createSession(owner, session, getEngine) },

@@ -1,6 +1,6 @@
 {
   "name": "@ekko-studio/plugin-kiro",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "type": "module",
   "private": true,
   "scripts": {
@@ -12,7 +12,7 @@
   "devDependencies": {
     "@ekko-studio/plugin-sdk": "file:./sdk"
   },
-  "description": "Use Kiro CLI with its native models in Studio.",
+  "description": "Run Kiro CLI with native or Studio-selected models.",
   "license": "MIT",
   "engines": {
     "node": ">=24.2"

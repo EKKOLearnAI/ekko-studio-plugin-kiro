@@ -1,6 +1,6 @@
 # Kiro plugin contract
 
-Both the plugin and Agent IDs are `kiro`. The plugin implements Studio Agent API v1 for global single chat with streaming. Use [the SDK types](../sdk/src/agents.ts) and [the RPC contract](../contracts/plugin.json) for the boundary fields.
+Both the plugin and Agent IDs are `kiro`. The plugin implements Studio Agent API v1 for global and scoped single chat with streaming. Use [the SDK types](../sdk/src/agents.ts) and [the RPC contract](../contracts/plugin.json) for the boundary fields.
 
 ## Engine management
 
@@ -21,6 +21,14 @@ The enabling Studio user and Profile own these RPCs, native credentials and engi
 - Approval requests are limited to the current ACP session. Studio presents the request and returns an offered one-time allow or deny option. A timeout, interruption or missing answer cancels the request.
 - The plugin streams text, reasoning summaries and tool lifecycles, then returns the complete response once. It sends `session/cancel` on interruption and closes the process after the turn or startup timeout. Studio can estimate token usage when native counts are unavailable.
 - Up to 32 attachments and 32 MiB per turn are resolved through authorized Studio APIs. Supported images are sent directly within a 6 MiB inline budget. Other inputs are staged in a private per-turn directory exposed to the native file tools. Staged files are removed at turn end.
-- The current model mode is global. Studio supplies its transcript on subsequent turns. Kiro stderr and raw ACP errors are discarded.
+- Studio supplies its transcript on subsequent turns. Kiro stderr and raw ACP errors are discarded.
+
+## Scoped model relay
+
+A scoped turn starts the native Kiro CLI V3 with client-owned authentication and private runtime and control-plane endpoint overrides. The relay publishes a single model for that turn and verifies the local bearer credential and bound model on each inference request. The ACP process receives the loopback key. The actual Studio lease is used by the relay when it calls the Studio Chat Completions endpoint.
+
+The relay translates native messages, images and tool results to Studio requests and translates streamed text, tool calls and completion markers back into Smithy EventStream. Kiro continues to run tools through its native ACP session. The activating user and Profile can use the native Skills and MCP configuration in scoped mode. Other users get an isolated Kiro directory with their own run bindings and session inputs.
+
+The plugin verifies that Kiro used the relay catalog before prompting. Scoped inference has been verified with the official Kiro CLI 3.5.0. Closing or cancelling the turn closes the relay and removes its profile directory. Studio supplies its transcript on later turns.
 
 The editors use Kiro’s existing native configuration format from the first install.
