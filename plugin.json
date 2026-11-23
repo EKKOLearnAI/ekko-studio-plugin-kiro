@@ -1,0 +1,151 @@
+{
+  "id": "kiro",
+  "name": "Kiro CLI",
+  "description": "Use Kiro CLI with its native models in Studio.",
+  "i18n": {
+    "en": {
+      "name": "Kiro CLI",
+      "description": "Use Kiro CLI with its native models in Studio.",
+      "views": {
+        "skills": "Skills",
+        "mcp": "MCP servers",
+        "native-login": "Configuration file"
+      }
+    },
+    "zh": {
+      "name": "Kiro CLI",
+      "description": "在 Studio 中使用 Kiro CLI 和原生模型。",
+      "views": {
+        "skills": "Skill 管理",
+        "mcp": "MCP 管理",
+        "native-login": "配置文件"
+      }
+    },
+    "zh-TW": {
+      "name": "Kiro CLI",
+      "description": "在 Studio 中使用 Kiro CLI 和原生模型。",
+      "views": {
+        "skills": "Skill 管理",
+        "mcp": "MCP 管理",
+        "native-login": "設定檔"
+      }
+    },
+    "ja": {
+      "name": "Kiro CLI",
+      "description": "Studio で Kiro CLI とネイティブモデルを使用します。",
+      "views": {
+        "skills": "スキル管理",
+        "mcp": "MCP サーバー",
+        "native-login": "設定ファイル"
+      }
+    },
+    "ko": {
+      "name": "Kiro CLI",
+      "description": "Studio에서 Kiro CLI와 기본 모델을 사용합니다.",
+      "views": {
+        "skills": "스킬 관리",
+        "mcp": "MCP 서버",
+        "native-login": "구성 파일"
+      }
+    },
+    "fr": {
+      "name": "Kiro CLI",
+      "description": "Utilisez Kiro CLI et ses modèles natifs dans Studio.",
+      "views": {
+        "skills": "Compétences",
+        "mcp": "Serveurs MCP",
+        "native-login": "Fichier de configuration"
+      }
+    },
+    "es": {
+      "name": "Kiro CLI",
+      "description": "Usa Kiro CLI y sus modelos nativos en Studio.",
+      "views": {
+        "skills": "Skills",
+        "mcp": "Servidores MCP",
+        "native-login": "Archivo de configuración"
+      }
+    },
+    "de": {
+      "name": "Kiro CLI",
+      "description": "Verwende Kiro CLI und seine nativen Modelle in Studio.",
+      "views": {
+        "skills": "Skills",
+        "mcp": "MCP-Server",
+        "native-login": "Konfigurationsdatei"
+      }
+    },
+    "pt": {
+      "name": "Kiro CLI",
+      "description": "Use o Kiro CLI e seus modelos nativos no Studio.",
+      "views": {
+        "skills": "Skills",
+        "mcp": "Servidores MCP",
+        "native-login": "Arquivo de configuração"
+      }
+    },
+    "ru": {
+      "name": "Kiro CLI",
+      "description": "Используйте Kiro CLI и его собственные модели в Studio.",
+      "views": {
+        "skills": "Навыки",
+        "mcp": "Серверы MCP",
+        "native-login": "Файл конфигурации"
+      }
+    },
+    "ar": {
+      "name": "Kiro CLI",
+      "description": "استخدم Kiro CLI ونماذجه الأصلية في Studio.",
+      "views": {
+        "skills": "المهارات",
+        "mcp": "خوادم MCP",
+        "native-login": "ملف الإعدادات"
+      }
+    },
+    "tr": {
+      "name": "Kiro CLI",
+      "description": "Studio’da Kiro CLI’ı ve yerel modellerini kullanın.",
+      "views": {
+        "skills": "Beceriler",
+        "mcp": "MCP sunucuları",
+        "native-login": "Yapılandırma dosyası"
+      }
+    }
+  },
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "server": "server.mjs",
+  "icon": "assets/icon.png",
+  "permissions": [
+    "agents",
+    "ui"
+  ],
+  "author": {
+    "name": "Ekko Studio"
+  },
+  "repository": "https://github.com/EKKOLearnAI/ekko-studio-plugin-kiro",
+  "homepage": "https://kiro.dev/docs/cli/",
+  "license": "MIT",
+  "client": "client.mjs",
+  "views": [
+    {
+      "id": "skills",
+      "title": "Skills",
+      "slot": "agent-settings",
+      "icon": "skills"
+    },
+    {
+      "id": "mcp",
+      "title": "MCP servers",
+      "slot": "agent-settings",
+      "icon": "mcp"
+    },
+    {
+      "id": "native-login",
+      "title": "Configuration file",
+      "slot": "agent-settings",
+      "icon": "settings"
+    }
+  ],
+  "documentation": "https://kiro.dev/docs/cli/installation/"
+}
