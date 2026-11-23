@@ -36,3 +36,5 @@ npm pack --dry-run --ignore-scripts
 ```
 
 The plugin is MIT licensed. The bundled Studio SDK retains its [license](sdk/LICENSE) and [notice](sdk/NOTICE). The vendored YAML parser retains its [license](assets/YAML-LICENSE).
+
+The [Kiro app icon](https://github.com/kirodotdev/Kiro/blob/a57ed51da0ca73cf6e78cf92e870b6806d200cea/assets/kiro-icon.png) identifies the supported Kiro CLI. Kiro branding belongs to Amazon Web Services.
