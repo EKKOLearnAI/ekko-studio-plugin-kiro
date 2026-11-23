@@ -331,7 +331,7 @@ async function mountResources(root, ctx, t) {
     heading.textContent = `${item ? t.editTitle : t.newTitle} ${skills ? 'Skill' : 'MCP'} · ${t.global}`
     name.value = item?.name || ''; name.disabled = Boolean(item)
     if (description) description.value = item?.description || ''
-    content.value = skills ? skillBody(document?.markdown ?? '') : JSON.stringify(item?.config || { type: 'stdio', command: 'npx', args: [] }, null, 2)
+    content.value = skills ? skillBody(document?.markdown ?? '') : JSON.stringify(item?.config || { command: 'npx', args: [] }, null, 2)
     enabled.checked = document?.enabled ?? item?.enabled ?? true
     baseline = values(); editor.hidden = false
     if (!dialog.open) dialog.showModal()

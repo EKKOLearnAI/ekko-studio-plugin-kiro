@@ -21,6 +21,6 @@ The enabling Studio user and Profile own these RPCs, native credentials and engi
 - Approval requests are limited to the current ACP session. Studio presents the request and returns an offered one-time allow or deny option. A timeout, interruption or missing answer cancels the request.
 - The plugin streams text, reasoning summaries and tool lifecycles, then returns the complete response once. It sends `session/cancel` on interruption and closes the process after the turn or startup timeout. Studio can estimate token usage when native counts are unavailable.
 - Up to 32 attachments and 32 MiB per turn are resolved through authorized Studio APIs. Supported images are sent directly within a 6 MiB inline budget. Other inputs are staged in a private per-turn directory exposed to the native file tools. Staged files are removed at turn end.
-- The plugin does not claim scoped models or native session resume. Studio supplies its own transcript on subsequent turns. Kiro stderr and raw ACP errors are discarded.
+- The current model mode is global. Studio supplies its transcript on subsequent turns. Kiro stderr and raw ACP errors are discarded.
 
-Settings follow Kiro’s existing native format, so there is no plugin settings migration on first install.
+The editors use Kiro’s existing native configuration format from the first install.
