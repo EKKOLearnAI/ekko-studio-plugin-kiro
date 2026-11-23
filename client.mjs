@@ -83,11 +83,10 @@ const themeStyles = `
   .mc-settings [data-theme-surface=card],.mc-manager [data-theme-surface=card]{--mc-border:var(--border-width,1px) solid var(--theme-card-border,var(--border-color));border-radius:var(--theme-card-radius,var(--radius-component,8px));box-shadow:var(--theme-card-shadow,none)}
   .mc-settings [data-theme-surface=input],.mc-manager [data-theme-surface=input]{--mc-border:var(--border-width,1px) solid var(--theme-input-border,var(--border-color));border-radius:var(--theme-input-radius,var(--radius-component,6px));box-shadow:var(--theme-input-shadow,none)}
   .mc-dialog{--mc-border:var(--border-width,1px) solid var(--theme-overlay-border,var(--border-color));border-radius:var(--theme-overlay-radius,var(--radius-component,12px));box-shadow:var(--theme-overlay-shadow,none)}
-  .mc-settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:calc(16px * var(--mc-space));min-width:0}
+  .mc-settings-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:calc(16px * var(--mc-space));min-width:0}
   .mc-section{display:flex;flex-direction:column;gap:12px;min-width:0;border:var(--mc-border);border-radius:var(--radius-component,10px);padding:calc(16px * var(--mc-space));background:var(--theme-card-bg,var(--bg-card))}
-  .mc-section h2{font-size:calc(var(--font-size-base,14px) * 14 / 14);font-weight:600;margin:0}.mc-runtime{grid-column:1/-1}
+  .mc-section h2{font-size:calc(var(--font-size-base,14px) * 14 / 14);font-weight:600;margin:0}
   .mc-runtime-heading{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.mc-runtime-heading p{font-size:12px}.mc-runtime-heading button{margin-inline-start:auto}.mc-runtime>p{font-size:12px}
-  .mc-runtime .mc-field{display:grid;grid-template-columns:minmax(160px,1fr) minmax(200px,1fr);align-items:center;gap:4px 24px;margin:0}.mc-runtime .mc-field p{grid-column:1;font-size:12px}.mc-runtime .mc-field input{grid-column:2;grid-row:1/3}
   .mc-field{display:flex;flex-direction:column;gap:6px;margin:0}.mc-field strong{font-size:13px;font-weight:500}.mc-field input,.mc-field textarea{width:100%}.mc-field p{font-size:12px}
   .mc-section .mc-field:has(textarea){flex:1}.mc-field textarea{flex:1;min-height:260px}
   .mc-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.mc-settings a{color:var(--accent-primary)}.mc-settings summary{cursor:pointer;color:var(--text-secondary)}.mc-settings pre{white-space:pre-wrap;overflow-wrap:anywhere}
@@ -107,7 +106,7 @@ const themeStyles = `
   .mc-file-heading{padding:8px 0;border-bottom:var(--mc-border);font:12px ui-monospace,monospace;color:var(--text-muted)}
   .mc-skill-content{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace}
   .mc-skills .mc-toolbar input{max-width:200px}.mc-manager .mc-back{display:none}
-  @media(max-width:768px){.mc-page-header{padding:12px;gap:10px}.mc-page-content{padding:12px}.mc-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.mc-items,.mc-settings-grid{grid-template-columns:1fr}.mc-dialog{width:calc(100vw - 24px)}.mc-editor{padding:16px}.mc-manager .mc-toolbar input{max-width:none}.mc-runtime .mc-field{display:flex;align-items:stretch;gap:6px}.mc-skills-sidebar{width:100%;border:0}.mc-skill-detail{display:none;padding:12px}.mc-show-detail .mc-skills-sidebar{display:none}.mc-show-detail .mc-skill-detail{display:flex}.mc-manager .mc-back{display:inline-flex}.mc-skills .mc-toolbar{flex:1;justify-content:flex-end}.mc-skills .mc-toolbar input{width:100%;max-width:180px;flex-basis:120px}}
+  @media(max-width:768px){.mc-page-header{padding:12px;gap:10px}.mc-page-content{padding:12px}.mc-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.mc-items{grid-template-columns:1fr}.mc-dialog{width:calc(100vw - 24px)}.mc-editor{padding:16px}.mc-manager .mc-toolbar input{max-width:none}.mc-skills-sidebar{width:100%;border:0}.mc-skill-detail{display:none;padding:12px}.mc-show-detail .mc-skills-sidebar{display:none}.mc-show-detail .mc-skill-detail{display:flex}.mc-manager .mc-back{display:inline-flex}.mc-skills .mc-toolbar{flex:1;justify-content:flex-end}.mc-skills .mc-toolbar input{width:100%;max-width:180px;flex-basis:120px}}
 `
 export async function mount(root, ctx) {
   const t = text[(ctx.locale || navigator.language).startsWith('zh') ? 'zh' : 'en']
